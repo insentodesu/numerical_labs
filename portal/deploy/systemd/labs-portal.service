@@ -1,0 +1,17 @@
+[Unit]
+Description=Streamlit portal (labs.inst.rest)
+After=network.target
+
+[Service]
+Type=simple
+User=labs
+Group=labs
+WorkingDirectory=/opt/labs/numerical_labs/portal
+Environment=LAB1_URL=https://labs.inst.rest/lab1/
+Environment=LAB2_URL=https://labs.inst.rest/lab2/
+ExecStart=/opt/labs/numerical_labs/portal/venv/bin/streamlit run /opt/labs/numerical_labs/portal/app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

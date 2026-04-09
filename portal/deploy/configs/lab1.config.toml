@@ -1,0 +1,18 @@
+# Скопировать на сервер как /opt/labs/numerical_labs/lab1/.streamlit/config.toml
+# (заменить локальный config при деплое за Nginx по пути /lab1/)
+
+[server]
+headless = true
+address = "127.0.0.1"
+port = 8501
+enableCORS = false
+enableXsrfProtection = true
+baseUrlPath = "lab1"
+fileWatcherType = "none"
+
+[theme]
+primaryColor = "#FFD700"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1A1A"
+textColor = "#FAFAFA"
+font = "sans serif"

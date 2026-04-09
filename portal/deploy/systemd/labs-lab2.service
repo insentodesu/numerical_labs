@@ -1,0 +1,15 @@
+[Unit]
+Description=Streamlit lab 2 (численные методы)
+After=network.target
+
+[Service]
+Type=simple
+User=labs
+Group=labs
+WorkingDirectory=/opt/labs/numerical_labs/lab2
+ExecStart=/opt/labs/numerical_labs/lab2/venv/bin/streamlit run /opt/labs/numerical_labs/lab2/homework_lab2_ui.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Задания 2 и 3</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 2rem; max-width: 640px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+        .task { margin-bottom: 2rem; }
+        .eq { font-family: "Times New Roman", serif; font-size: 1.1rem; margin: 1rem 0; padding: 0.5rem; background: #f5f5f5; border-radius: 6px; }
+        .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+        select, button { padding: 0.5rem 1rem; font-size: 1rem; border-radius: 6px; border: 1px solid #ccc; }
+        button { background: #10a37f; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0d8a6a; }
+        .result { margin-top: 1rem; padding: 1rem; background: #e8f5e9; border-radius: 6px; }
+        .error { background: #ffebee; color: #c62828; }
+        .trace { white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto; margin: 0.5rem 0; }
+        table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+        th, td { padding: 0.4rem; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f5f5f5; }
+        .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 1px solid #ddd; }
+        .tab { padding: 0.5rem 1rem; cursor: pointer; border: none; background: none; font-size: 1rem; }
+        .tab.active { font-weight: bold; border-bottom: 2px solid #10a37f; margin-bottom: -1px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <h1>Задания 2 и 3</h1>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="2">2</button>
+        <button class="tab" data-tab="3">3</button>
+    </div>
+
+    <div id="task2" class="tab-content active">
+        <div class="task">
+            <div class="eq">f(x) = (x − 22)² + sin(x − 22) = 0</div>
+            <div class="controls">
+                <select id="method2">
+                    <option value="secant">Секущих</option>
+                    <option value="newton">Ньютона</option>
+                </select>
+                <button onclick="calc(2)">Рассчитать</button>
+            </div>
+            <div id="out2"></div>
+        </div>
+    </div>
+
+    <div id="task3" class="tab-content">
+        <div class="task">
+            <div class="eq">f(x) = 22x − 10 − sin(x − 10/22) = 0</div>
+            <div class="controls">
+                <button onclick="calc(3)">Рассчитать</button>
+            </div>
+            <div id="out3"></div>
+        </div>
+    </div>
+
+    <script>
+        document.querySelectorAll('.tab').forEach(t => {
+            t.onclick = () => {
+                document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+                t.classList.add('active');
+                document.getElementById('task' + t.dataset.tab).classList.add('active');
+            };
+        });
+
+        async function calc(task) {
+            const out = document.getElementById('out' + task);
+            out.innerHTML = '<p>Вычисление...</p>';
+
+            const body = { task: String(task) };
+            if (task === 2) body.method = document.getElementById('method2').value;
+
+            const r = await fetch('/api/calc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await r.json();
+
+            if (!data.ok) {
+                out.innerHTML = '<div class="result error">' + data.error + '</div>';
+                return;
+            }
+
+            let html = '<div class="result">';
+            html += '<p><strong>x ≈ ' + data.root + '</strong> · ' + data.iters + ' итераций · |f| = ' + data.f_val.toExponential(2) + '</p>';
+            if (data.trace) {
+                html += '<details><summary>Трассировка</summary><pre class="trace">' + escapeHtml(data.trace) + '</pre></details>';
+            }
+            html += '<table><tr><th>n</th><th>x_n</th><th>f(x_n)</th><th>|Δx|</th></tr>';
+            data.table.forEach(row => {
+                html += '<tr><td>' + row.n + '</td><td>' + row.x + '</td><td>' + row.f + '</td><td>' + (row.dx !== null ? row.dx : '—') + '</td></tr>';
+            });
+            html += '</table></div>';
+            out.innerHTML = html;
+        }
+
+        function escapeHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Скопировать на сервер как /opt/labs/numerical_labs/portal/.streamlit/config.toml
+
+[server]
+headless = true
+address = "127.0.0.1"
+port = 8500
+enableCORS = false
+enableXsrfProtection = true
+fileWatcherType = "none"

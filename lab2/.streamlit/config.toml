@@ -1,0 +1,4 @@
+# В ~/Documents (часто iCloud) нативный file watcher на macOS может «виснуть».
+# Для автообновления при сохранении можно поставить poll или перенести проект вне iCloud.
+[server]
+fileWatcherType = "none"
