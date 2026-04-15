@@ -3,12 +3,10 @@
 вычисление определителя тем же ходом, невязка r = Ax - b, методы простой итерации и Зейделя
 (лекции 3-4, 8-9), подробная LaTeX-трассировка для Гаусса.
 """
-import math  # модуль math: произведение диагонали (prod), isnan и т.д.
+import math
 
-
-# Порог "практически ноль" при сравнении с опорным элементом (вырожденность / шум).
+# Сравнение с опорным элементом (вырожденность); в LaTeX не выводим полную матрицу при большом n.
 _EPS = 1e-15
-# При n больше этого числа в трассировку не вставляем полные матрицы в LaTeX (слишком громоздко).
 _LATEX_MAX_N = 6
 
 
@@ -20,81 +18,227 @@ def build_system(n: int, g: int, k: int) -> tuple[list[list[float]], list[float]
     Для n == 3 используется каноническая 3x3 система из методички; для больших n -
     вспомогательная регулярная схема заполнения (для отладки и произвольного размера).
     """
-    # Целые g, k приводим к float, чтобы матрица была вещественной.
     gf, kf = float(g), float(k)
     if n == 3:
-        # Три уравнения с параметром g в коэффициентах и k, k+1, k+2 в b.
-        # Первая строка A и далее - фиксированный шаблон из задания.
         A = [
             [gf, gf + 1, gf + 2],
             [2 * gf, gf + 5, gf - 6],
             [3 * gf, gf - 1, -3.0],
         ]
-        # Правая часть: k, k+1, k+2.
         return A, [kf, kf + 1, kf + 2]
-    # Общий случай: диагональ "крупная", внедиагональные - смешанные g, k.
-    # Вспомогательная величина для масштаба диагонали.
+    # n > 3: диагонально доминирующий шаблон (удобно для тестов итераций).
     base = abs(gf) + abs(kf) + 1.0
-    # Нулевая матрица nxn.
     A = [[0.0] * n for _ in range(n)]
-    # Заполняем все элементы по формулам (диагональ / внедиагональ).
     for i in range(n):
         for j in range(n):
-            # На диагонали - крупное значение; иначе - дробное от g,k.
             A[i][j] = (
                 base * n + abs(g + k) * (i + 1) if i == j else (gf * (i - j) + kf) / (n + 1)
             )
-    # b_i = k + i для i = 0..n-1.
     return A, [kf + float(i) for i in range(n)]
 
 
 def Ax(A: list[list[float]], x: list[float]) -> list[float]:
     """Умножение матрицы A на вектор x: результат - список длины n (строки A)."""
-    # i-я компонента: скалярное произведение i-й строки A на x.
     return [sum(A[i][j] * x[j] for j in range(len(x))) for i in range(len(A))]
 
 
 def residual(A: list[list[float]], b: list[float], x: list[float]) -> list[float]:
     """Невязка при подстановке решения: r = Ax - b (покомпонентно)."""
-    # (Ax)_i минус b_i для каждого i.
     return [v - b[i] for i, v in enumerate(Ax(A, x))]
 
 
 def norm_inf(v: list[float]) -> float:
     """Норма ||v||_inf = max_i |v_i|; для пустого вектора возвращает 0."""
-    # Максимум из модулей компонент; пустой список даёт 0.
     return max(abs(t) for t in v) if v else 0.0
 
 
 def norm_1_vec(v: list[float]) -> float:
     """Норма ||v||_1 = sum_i |v_i|."""
-    # Сумма модулей всех компонент.
     return sum(abs(t) for t in v)
 
 
 def matrix_norm_inf(A: list[list[float]]) -> float:
     """Норма матрицы, согласованная с ||*||_inf: ||A||_inf = max_i sum_j |a_ij| (макс. сумма по строке)."""
-    # Пустая матрица - норма 0.
     if not A:
         return 0.0
-    # Берём максимум по строкам от суммы |a_ij| по столбцам j.
     return max(sum(abs(A[i][j]) for j in range(len(A[0]))) for i in range(len(A)))
 
 
 def matrix_norm_1(A: list[list[float]]) -> float:
     """Норма матрицы, согласованная с ||*||_1: ||A||_1 = max_j sum_i |a_ij| (макс. сумма по столбцу)."""
-    # Нет строк или нет столбцов - норма 0.
     if not A or not A[0]:
         return 0.0
-    # Размеры: n строк, m столбцов.
     n, m = len(A), len(A[0])
-    # Максимум по j от суммы |a_ij| по строкам i.
     return max(sum(abs(A[i][j]) for i in range(n)) for j in range(m))
 
 
 def vec_sub(a: list[float], b: list[float]) -> list[float]:
     """Покомпонентная разность a - b (длины векторов должны совпадать)."""
     return [a[i] - b[i] for i in range(len(a))]
+
+
+def is_strict_diagonally_dominant(A: list[list[float]]) -> bool:
+    """
+    Проверка строгого диагонального преобладания по строкам:
+    |a_ii| > sum_{j!=i} |a_ij| для всех i.
+    """
+    n = len(A)
+    for i in range(n):
+        diag = abs(A[i][i])
+        off_diag_sum = sum(abs(A[i][j]) for j in range(n) if j != i)
+        if not (diag > off_diag_sum + _EPS):
+            return False
+    return True
+
+
+def _try_row_permutation_for_diagonal_dominance(
+    A: list[list[float]], b: list[float]
+) -> tuple[list[list[float]], list[float], list[int]] | None:
+    """
+    Пытается добиться строгого диагонального преобладания только перестановкой строк.
+    Если не удалось - возвращает None.
+    """
+    n = len(A)
+    # candidates[i] = строки, которые можно поставить на i-ю позицию так,
+    # чтобы для столбца i выполнялось |a_ri| > sum_{j!=i}|a_rj|.
+    candidates: list[list[int]] = []
+    for i in range(n):
+        valid_rows: list[int] = []
+        for r in range(n):
+            diag = abs(A[r][i])
+            off_diag_sum = sum(abs(A[r][j]) for j in range(n) if j != i)
+            if diag > off_diag_sum + _EPS:
+                valid_rows.append(r)
+        candidates.append(valid_rows)
+
+    # Если для какого-то столбца нет ни одной подходящей строки, дальше искать бессмысленно.
+    if any(len(cands) == 0 for cands in candidates):
+        return None
+
+    # Поиск совершенного паросочетания (Kuhn): столбцы/позиции i -> строки r.
+    match_row_for_pos = [-1] * n
+
+    def dfs(pos: int, seen_rows: list[bool]) -> bool:
+        for r in candidates[pos]:
+            if seen_rows[r]:
+                continue
+            seen_rows[r] = True
+            if match_row_for_pos[r] == -1 or dfs(match_row_for_pos[r], seen_rows):
+                match_row_for_pos[r] = pos
+                return True
+        return False
+
+    matched = 0
+    for pos in range(n):
+        seen = [False] * n
+        if dfs(pos, seen):
+            matched += 1
+
+    if matched != n:
+        return None
+
+    # Преобразуем отображение row -> pos в порядок строк row_perm[pos] = row.
+    row_perm = [-1] * n
+    for row, pos in enumerate(match_row_for_pos):
+        if pos != -1:
+            row_perm[pos] = row
+
+    if any(v == -1 for v in row_perm):
+        return None
+
+    A_p = [A[src][:] for src in row_perm]
+    b_p = [b[src] for src in row_perm]
+    if not is_strict_diagonally_dominant(A_p):
+        return None
+    return A_p, b_p, row_perm
+
+
+def _looks_like_canonical_lab3(A: list[list[float]], b: list[float]) -> bool:
+    """
+    Проверяет, что это каноническая 3x3 система из build_system(n=3):
+    [g, g+1, g+2], [2g, g+5, g-6], [3g, g-1, -3], b=[k, k+1, k+2].
+    """
+    if len(A) != 3 or any(len(row) != 3 for row in A) or len(b) != 3:
+        return False
+    g = A[0][0]
+    checks = [
+        abs(A[0][1] - (g + 1.0)) < 1e-12,
+        abs(A[0][2] - (g + 2.0)) < 1e-12,
+        abs(A[1][0] - (2.0 * g)) < 1e-12,
+        abs(A[1][1] - (g + 5.0)) < 1e-12,
+        abs(A[1][2] - (g - 6.0)) < 1e-12,
+        abs(A[2][0] - (3.0 * g)) < 1e-12,
+        abs(A[2][1] - (g - 1.0)) < 1e-12,
+        abs(A[2][2] + 3.0) < 1e-12,
+        abs((b[1] - b[0]) - 1.0) < 1e-12,
+        abs((b[2] - b[1]) - 1.0) < 1e-12,
+    ]
+    return all(checks)
+
+
+def _canonical_lab3_equivalent_transform(
+    A: list[list[float]], b: list[float]
+) -> tuple[list[list[float]], list[float]]:
+    """
+    Эквивалентное преобразование канонической 3x3 системы:
+      R1' = R1 + R3
+      R2' = R3 - R2
+      R3' = R1 - R3
+    """
+    r1, r2, r3 = A
+    b1, b2, b3 = b
+    A_t = [
+        [r1[j] + r3[j] for j in range(3)],
+        [r3[j] - r2[j] for j in range(3)],
+        [r1[j] - r3[j] for j in range(3)],
+    ]
+    b_t = [b1 + b3, b3 - b2, b1 - b3]
+    return A_t, b_t
+
+
+def prepare_system_for_iterations(
+    A: list[list[float]], b: list[float]
+) -> tuple[list[list[float]], list[float], list[int]]:
+    """
+    Пытается получить строгое диагональное преобладание:
+    1) перестановкой строк;
+    2) для канонической 3x3 системы из build_system - эквивалентным линейным преобразованием
+       уравнений, затем (при необходимости) перестановкой строк.
+
+    Возвращает:
+      A_p, b_p - переставленные матрица и правая часть;
+      row_perm - список длины n, где row_perm[i] = индекс исходной строки,
+                 поставленной на позицию i.
+    Если добиться строгого диагонального преобладания не удалось, бросает ValueError.
+    """
+    n = len(A)
+    if n == 0:
+        return [], [], []
+    if any(len(row) != n for row in A) or len(b) != n:
+        raise ValueError("Некорректные размеры A или b для подготовки к итерациям.")
+
+    if is_strict_diagonally_dominant(A):
+        return _copy_mat(A), list(b), list(range(n))
+
+    perm_attempt = _try_row_permutation_for_diagonal_dominance(A, b)
+    if perm_attempt is not None:
+        return perm_attempt
+
+    # Специальный эквивалентный шаг для канонической 3x3 системы из задания:
+    # на примере g=1,k=9 даёт ровно:
+    # [4,2,0], [1,-6,2], [-2,2,6], b=(20,1,-2).
+    if _looks_like_canonical_lab3(A, b):
+        A_t, b_t = _canonical_lab3_equivalent_transform(A, b)
+        if is_strict_diagonally_dominant(A_t):
+            return A_t, b_t, list(range(n))
+        perm_attempt_t = _try_row_permutation_for_diagonal_dominance(A_t, b_t)
+        if perm_attempt_t is not None:
+            return perm_attempt_t
+
+    raise ValueError(
+        "Нельзя привести систему к строгому диагональному преобладанию "
+        "для итерационных методов."
+    )
 
 
 def jacobi_iterative_form(
@@ -235,8 +379,11 @@ def simple_iteration_solve(
     При verbose=True печатает этап проверки сходимости и каждую итерацию; иначе только заполняет history.
     В history первая строка - k=0 (начальное приближение), далее k>=1.
     """
-    # Строим alpha и beta из исходной системы (деление на диагональ).
-    alpha, beta = jacobi_iterative_form(A, b)
+    # Для устойчивой сходимости сначала приводим систему к строгому диагональному преобладанию
+    # (если это возможно перестановкой строк).
+    A_it, b_it, row_perm = prepare_system_for_iterations(A, b)
+    # Строим alpha и beta из подготовленной системы (деление на диагональ).
+    alpha, beta = jacobi_iterative_form(A_it, b_it)
     # Этап 1: проверка ||alpha||_inf и ||alpha||_1.
     conv_ok, conv_msg, n_inf, n_1 = check_convergence_simple_iteration(alpha)
     # Апостериорная оценка ||x-x^(k)|| <= (nu/(1-nu))||x^(k)-x^(k-1)|| строго согласована с ||·||_inf,
@@ -245,6 +392,9 @@ def simple_iteration_solve(
     nu_for_est = n_inf if n_inf < 1.0 - _EPS else (n_1 if n_1 < 1.0 - _EPS else None)
 
     _iter_print_header("Метод простой итерации (Якоби в форме x = alpha*x + beta)", conv_ok, conv_msg, verbose=verbose)
+    if verbose and row_perm != list(range(len(A_it))):
+        perm_human = [p + 1 for p in row_perm]
+        print(f"Перед итерациями выполнена перестановка строк для диагонального преобладания: {perm_human}.")
 
     # Начальное приближение: по умолчанию beta, иначе переданный x0.
     x = list(beta if x0 is None else x0)
@@ -322,12 +472,17 @@ def seidel_solve(
     verbose: печать в консоль; при False удобно вызывать из Streamlit и разбирать history.
     В history есть строка k=0, затем шаги k>=1 (поле q повторяется в каждой записи для отладки).
     """
-    # Та же alpha, beta, что и для простой итерации; отличается только порядок обновления компонент.
-    alpha, beta = jacobi_iterative_form(A, b)
+    # Та же alpha, beta, что и для простой итерации; перед этим приводим систему
+    # к строгому диагональному преобладанию (если возможно).
+    A_it, b_it, row_perm = prepare_system_for_iterations(A, b)
+    alpha, beta = jacobi_iterative_form(A_it, b_it)
     # Этап 1: проверка q = ||alpha_2||_inf/(1-||alpha_1||_inf).
     conv_ok, conv_msg, na1, na2, q = check_convergence_seidel(alpha)
 
     _iter_print_header("Метод Зейделя", conv_ok, conv_msg, verbose=verbose)
+    if verbose and row_perm != list(range(len(A_it))):
+        perm_human = [p + 1 for p in row_perm]
+        print(f"Перед итерациями выполнена перестановка строк для диагонального преобладания: {perm_human}.")
 
     n = len(beta)
     # Старт: beta или пользовательский x0.
