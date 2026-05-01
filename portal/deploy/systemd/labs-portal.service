@@ -9,6 +9,7 @@ Group=labs
 WorkingDirectory=/opt/labs/numerical_labs/portal
 Environment=LAB1_URL=https://labs.inst.rest/lab1/
 Environment=LAB2_URL=https://labs.inst.rest/lab2/
+Environment=LAB3_URL=https://labs.inst.rest/lab3/
 ExecStart=/opt/labs/numerical_labs/portal/venv/bin/streamlit run /opt/labs/numerical_labs/portal/app.py
 Restart=on-failure
 RestartSec=5

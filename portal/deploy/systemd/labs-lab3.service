@@ -1,0 +1,15 @@
+[Unit]
+Description=Streamlit lab 3 (интерполяция и сплайны)
+After=network.target
+
+[Service]
+Type=simple
+User=labs
+Group=labs
+WorkingDirectory=/opt/labs/numerical_labs/lab3
+ExecStart=/opt/labs/numerical_labs/lab3/venv/bin/streamlit run /opt/labs/numerical_labs/lab3/homework_lab3_ui.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

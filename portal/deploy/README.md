@@ -2,7 +2,7 @@
 
 Репозиторий клонируется целиком; на сервере ожидается путь **`/opt/labs/numerical_labs`** (см. юниты в `deploy/systemd/`).
 
-Схема: **портал** на `/`, лабораторные на **`/lab1/`** и **`/lab2/`**, три процесса Streamlit за **Nginx**, Streamlit слушает только **127.0.0.1**.
+Схема: **портал** на `/`, лабораторные на **`/lab1/`**, **`/lab2/`** и **`/lab3/`**, четыре процесса Streamlit за **Nginx**, Streamlit слушает только **127.0.0.1**.
 
 ## 1. Сервер: пакеты и пользователь
 
@@ -32,15 +32,17 @@ sudo -u labs git clone https://github.com/insentodesu/numerical_labs.git /opt/la
 ```bash
 sudo -u labs mkdir -p /opt/labs/numerical_labs/portal/.streamlit \
   /opt/labs/numerical_labs/lab1/.streamlit \
-  /opt/labs/numerical_labs/lab2/.streamlit
+  /opt/labs/numerical_labs/lab2/.streamlit \
+  /opt/labs/numerical_labs/lab3/.streamlit
 
 BASE=/opt/labs/numerical_labs/portal/deploy/configs
 sudo -u labs cp "$BASE/portal.config.toml" /opt/labs/numerical_labs/portal/.streamlit/config.toml
 sudo -u labs cp "$BASE/lab1.config.toml"   /opt/labs/numerical_labs/lab1/.streamlit/config.toml
 sudo -u labs cp "$BASE/lab2.config.toml"  /opt/labs/numerical_labs/lab2/.streamlit/config.toml
+sudo -u labs cp "$BASE/lab3.config.toml"  /opt/labs/numerical_labs/lab3/.streamlit/config.toml
 ```
 
-`baseUrlPath` в lab1/lab2 обязателен для прокси Nginx по `/lab1/` и `/lab2/`.
+`baseUrlPath` в lab1/lab2/lab3 обязателен для прокси Nginx по `/lab1/`, `/lab2/` и `/lab3/`.
 
 ## 4. Виртуальные окружения и зависимости
 
@@ -49,6 +51,7 @@ sudo -u labs bash -c '
 cd /opt/labs/numerical_labs/portal && python3 -m venv venv && . venv/bin/activate && pip install -U pip && pip install -r requirements.txt
 cd /opt/labs/numerical_labs/lab1   && python3 -m venv venv && . venv/bin/activate && pip install -U pip && pip install -r requirements.txt
 cd /opt/labs/numerical_labs/lab2   && python3 -m venv venv && . venv/bin/activate && pip install -U pip && pip install -r requirements.txt
+cd /opt/labs/numerical_labs/lab3   && python3 -m venv venv && . venv/bin/activate && pip install -U pip && pip install -r requirements.txt
 '
 ```
 
@@ -58,13 +61,14 @@ cd /opt/labs/numerical_labs/lab2   && python3 -m venv venv && . venv/bin/activat
 sudo cp /opt/labs/numerical_labs/portal/deploy/systemd/labs-portal.service /etc/systemd/system/
 sudo cp /opt/labs/numerical_labs/portal/deploy/systemd/labs-lab1.service   /etc/systemd/system/
 sudo cp /opt/labs/numerical_labs/portal/deploy/systemd/labs-lab2.service   /etc/systemd/system/
+sudo cp /opt/labs/numerical_labs/portal/deploy/systemd/labs-lab3.service   /etc/systemd/system/
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now labs-portal labs-lab1 labs-lab2
-sudo systemctl status labs-portal labs-lab1 labs-lab2
+sudo systemctl enable --now labs-portal labs-lab1 labs-lab2 labs-lab3
+sudo systemctl status labs-portal labs-lab1 labs-lab2 labs-lab3
 ```
 
-При другом домене измените `Environment=LAB1_URL=...` и `LAB2_URL=...` в `labs-portal.service`.
+При другом домене измените `Environment=LAB1_URL=...`, `LAB2_URL=...` и `LAB3_URL=...` в `labs-portal.service`.
 
 ## 6. Nginx
 
@@ -93,7 +97,7 @@ sudo ufw enable
 ## 7. Проверка
 
 - `https://labs.inst.rest/` — портал.
-- Кнопки ведут на `.../lab1/` и `.../lab2/`.
+- Кнопки ведут на `.../lab1/`, `.../lab2/` и `.../lab3/`.
 - Логи: `journalctl -u labs-portal -f`.
 
 ## Обновление кода
@@ -101,5 +105,5 @@ sudo ufw enable
 ```bash
 sudo -u labs git -C /opt/labs/numerical_labs pull
 # при изменении requirements.txt — pip install в нужном venv
-sudo systemctl restart labs-portal labs-lab1 labs-lab2
+sudo systemctl restart labs-portal labs-lab1 labs-lab2 labs-lab3
 ```
