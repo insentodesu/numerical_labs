@@ -86,6 +86,34 @@ def newton_eval_divided_differences(
     return s
 
 
+def newton_eval_divided_differences_trace(
+    x_nodes: Sequence[float], coeffs: Sequence[float], x_val: float
+) -> tuple[float, list[dict[str, float]]]:
+    """
+    Пошаговое накопление суммы из формулы (49), лекция 4.
+    """
+    s = 0.0
+    prod = 1.0
+    steps: list[dict[str, float]] = []
+    for j in range(len(coeffs)):
+        if j == 0:
+            prod = 1.0
+        else:
+            prod *= x_val - x_nodes[j - 1]
+        addend = float(coeffs[j]) * prod
+        s += addend
+        steps.append(
+            {
+                "j": float(j),
+                "prod": prod,
+                "c_j": float(coeffs[j]),
+                "addend": addend,
+                "partial_sum": s,
+            }
+        )
+    return s, steps
+
+
 def newton_interpolate_general(
     x_nodes: Sequence[float], y_nodes: Sequence[float], x: float, *, reorder: bool
 ) -> float:
@@ -129,16 +157,108 @@ def newton_forward_equal_spacing(
     Лекция 3–4: ввод q = (x-x0)/h и разложение (46):
     N(x0+qh) = y0 + qΔy0 + [q(q-1)/2!] Δ^2 y0 + … + [q…(q-n+1)/n!] Δ^n y0.
     """
-    q = (x - x0) / h
+    s, _, _ = newton_forward_trace(x0, h, y, x)
+    return s
+
+
+def divided_differences_triangle(
+    x: Sequence[float], y: Sequence[float]
+) -> list[list[float | None]]:
+    """
+    Полная треугольная таблица разделённых разностей (для вывода в отчёт).
+
+    Элемент [i][k] = f[x_i,…,x_{i+k}] при k ≤ n-1-i, иначе None.
+    Лекция 4, формула (47).
+    """
+    n = len(x)
+    table: list[list[float | None]] = [[None] * n for _ in range(n)]
+    for i in range(n):
+        table[i][0] = float(y[i])
+    for k in range(1, n):
+        for i in range(n - k):
+            num = float(table[i + 1][k - 1]) - float(table[i][k - 1])
+            den = x[i + k] - x[i]
+            table[i][k] = num / den
+    return table
+
+
+def lagrange_trace_at(
+    x_nodes: Sequence[float], y_nodes: Sequence[float], x_val: float
+) -> tuple[float, list[dict[str, float]]]:
+    """
+    Значение P(x_val) и покомпонентный разбор Σ y_i ℓ_i(x).
+
+    Лекция 2: (3.8), базис ℓ_i после (3.9).
+    """
+    details: list[dict[str, float]] = []
+    total = 0.0
+    for i in range(len(x_nodes)):
+        ell = lagrange_basis(x_nodes, i, x_val)
+        c = float(y_nodes[i]) * ell
+        total += c
+        details.append({"i": float(i), "ell_i": ell, "y_i": float(y_nodes[i]), "term": c})
+    return total, details
+
+
+def newton_forward_trace(
+    x0: float, h: float, y: Sequence[float], x_val: float
+) -> tuple[float, list[dict[str, float]], float]:
+    """
+    Значение N(x) и вклад каждого слагаемого из формулы (46), лекция 3–4.
+
+    Возвращает: (сумма, список словарей по k, q).
+    """
+    q = (x_val - x0) / h
     fd = finite_differences_forward(y)
     s = float(y[0])
+    terms: list[dict[str, float]] = [
+        {"k": 0.0, "binom_part": 1.0, "delta": float(y[0]), "addend": float(y[0])}
+    ]
     for k in range(1, len(y)):
         dky0 = fd[k][0]
         prod = 1.0
         for t in range(k):
             prod *= q - t
-        s += (prod / math.factorial(k)) * dky0
-    return s
+        add = (prod / math.factorial(k)) * dky0
+        s += add
+        terms.append(
+            {
+                "k": float(k),
+                "binom_part": prod / math.factorial(k),
+                "delta": dky0,
+                "addend": add,
+            }
+        )
+    return s, terms, q
+
+
+def linear_spline_segments(
+    x_nodes: Sequence[float], y_nodes: Sequence[float],
+) -> list[dict[str, float]]:
+    """
+    Коэффициенты a_i, b_i для φ(x)=a_i x + b_i на [x_{i-1}, x_i] (лекция 5, (50)–(51)).
+    """
+    xs, ys = list(x_nodes), list(y_nodes)
+    segs: list[dict[str, float]] = []
+    for i in range(1, len(xs)):
+        x0, y0, x1, y1 = xs[i - 1], ys[i - 1], xs[i], ys[i]
+        if x1 == x0:
+            a, b = 0.0, y0
+        else:
+            a = (y1 - y0) / (x1 - x0)
+            b = y0 - a * x0
+        segs.append(
+            {
+                "segment": float(i),
+                "x_lo": x0,
+                "x_hi": x1,
+                "y_lo": y0,
+                "y_hi": y1,
+                "a": a,
+                "b": b,
+            }
+        )
+    return segs
 
 
 def linear_spline(
