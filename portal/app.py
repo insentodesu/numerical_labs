@@ -69,7 +69,7 @@ with c2:
     st.link_button("Открыть лабораторную №2", LAB2_URL, use_container_width=True)
 with c3:
     st.subheader("Лабораторная №3")
-    st.caption("Интерполяция и линейный сплайн")
+    st.caption("Лагранж, Ньютон (вперёд и назад), линейный сплайн")
     st.link_button("Открыть лабораторную №3", LAB3_URL, use_container_width=True)
 
 with st.expander("Куда ведут кнопки (отладка)"):

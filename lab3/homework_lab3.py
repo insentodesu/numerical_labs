@@ -10,9 +10,16 @@ import math
 from typing import Sequence
 
 
-def f_variant(x: float, g: int, k: int) -> float:
-    """Табличная функция по заданию: f(x) = sin(x) + g/k."""
-    return math.sin(x) + float(g) / float(k)
+def f_variant(x: float) -> float:
+    """
+    Табличная функция по заданию лаб. №3 (п. 2–4): f(x) = sin(x) / x.
+
+    В нуле sin(x)/x не определена как дробь; по непрерывному продолжению f(0)=1
+    (предел при x→0), это же значение используют при заполнении таблицы в узле x=0.
+    """
+    if abs(x) < 1e-15:
+        return 1.0
+    return math.sin(x) / x
 
 
 def lagrange_basis(
@@ -200,6 +207,67 @@ def lagrange_trace_at(
     return total, details
 
 
+def finite_differences_backward_at_last(y: Sequence[float]) -> list[float]:
+    """
+    Значения ∇^k y_n у последнего узла (n = len(y)-1) для равноотстоящей сетки.
+
+    Лекция 3–4: обратные конечные разности ∇ y_i = y_i - y_{i-1},
+    ∇^k y_i = ∇^{k-1} y_i - ∇^{k-1} y_{i-1}. Для второй формулы Ньютона нужны
+    ∇ y_n, ∇^2 y_n, … относительно правого конца таблицы.
+    """
+    row = [float(t) for t in y]
+    out: list[float] = []
+    while row:
+        out.append(row[-1])
+        if len(row) == 1:
+            break
+        row = [row[i] - row[i - 1] for i in range(1, len(row))]
+    return out
+
+
+def newton_backward_equal_spacing(
+    xn: float, h: float, y: Sequence[float], x: float
+) -> float:
+    """
+    Вторая интерполяционная формула Ньютона (для равноотстоящих узлов).
+
+    Лекция 3–4: q = (x - x_n)/h, x_n — последний узел,
+    N(x) = y_n + q∇y_n + [q(q+1)/2!]∇²y_n + … + [q…(q+k-1)/k!]∇^k y_n.
+    """
+    s, _, _ = newton_backward_trace(xn, h, y, x)
+    return s
+
+
+def newton_backward_trace(
+    xn: float, h: float, y: Sequence[float], x_val: float
+) -> tuple[float, list[dict[str, float]], float]:
+    """
+    Значение N(x) по второй формуле Ньютона и вклад слагаемых (как в (46), но с ∇ и q от x_n).
+    """
+    q = (x_val - xn) / h
+    nabla_at_n = finite_differences_backward_at_last(y)
+    s = float(nabla_at_n[0])
+    terms: list[dict[str, float]] = [
+        {"k": 0.0, "binom_part": 1.0, "nabla": nabla_at_n[0], "addend": float(nabla_at_n[0])}
+    ]
+    for k in range(1, len(y)):
+        nabla_k = nabla_at_n[k]
+        prod = 1.0
+        for t in range(k):
+            prod *= q + t
+        add = (prod / math.factorial(k)) * nabla_k
+        s += add
+        terms.append(
+            {
+                "k": float(k),
+                "binom_part": prod / math.factorial(k),
+                "nabla": nabla_k,
+                "addend": add,
+            }
+        )
+    return s, terms, q
+
+
 def newton_forward_trace(
     x0: float, h: float, y: Sequence[float], x_val: float
 ) -> tuple[float, list[dict[str, float]], float]:
@@ -297,7 +365,7 @@ def table1_nodes(g: int, k: int) -> list[float]:
 
 def table1_test_points(g: int, k: int) -> list[float]:
     base = float(g) - 2.0 * float(k)
-    return [base - 2.7, base - 0.5, base + 2.3]
+    return [base - 2.7, base - 0.5, base + 2.8]
 
 
 def table2_nodes(g: int, k: int) -> list[float]:
@@ -307,23 +375,21 @@ def table2_nodes(g: int, k: int) -> list[float]:
 
 def table2_test_points(g: int, k: int) -> list[float]:
     base = float(g) - 2.0 * float(k)
-    return [base - 1.7, base + 0.6, base + 1.9]
+    return [base - 1.7, base - 0.3, base + 1.6]
 
 
 def spline_test_points(g: int, k: int) -> list[float]:
     """Контрольные точки для линейного сплайна по таблице 1 (из задания)."""
     base = float(g) - 2.0 * float(k)
-    return [base - 2.7, base - 0.5, base + 0.8]
+    return [base - 1.7, base - 0.3, base + 0.8]
 
 
 def build_tables(g: int, k: int) -> dict:
     """Собирает узлы и значения f для пунктов 2–4."""
-    if k == 0:
-        raise ValueError("k должно быть ненулевым (деление g/k в f(x)).")
     x1 = table1_nodes(g, k)
-    y1 = [f_variant(t, g, k) for t in x1]
+    y1 = [f_variant(t) for t in x1]
     x2 = table2_nodes(g, k)
-    y2 = [f_variant(t, g, k) for t in x2]
+    y2 = [f_variant(t) for t in x2]
     h2 = x2[1] - x2[0]
     return {
         "table1": (x1, y1),
