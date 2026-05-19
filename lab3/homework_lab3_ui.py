@@ -1,15 +1,23 @@
 """
-Streamlit: лабораторная «Приближение функций» — подробные шаги, ссылки на лекции, графики.
+Streamlit-отчёт лаб. №3. Где что искать при защите:
+
+  Исходные данные + график обзора     — после кнопки «Рассчитать», fig_interpolation_overview
+  ЗАДАНИЕ 1 — Лагранж, таблица 2     — subheader «1. Многочлен Лагранжа»
+  ЗАДАНИЕ 2 — Лагранж/Ньютон, табл. 1 — subheader «2. Лагранж и Ньютон»
+  ЗАДАНИЕ 3 — прямая/обратная Ньютон — subheader «3. Ньютон по таблице 2»
+  ЗАДАНИЕ 4 — линейный сплайн        — subheader «4. Линейный сплайн»
+
+Вычисления — в homework_lab3.py; здесь только вывод, LaTeX и графики.
 """
 from __future__ import annotations
 
 import matplotlib
 
-matplotlib.use("Agg")
+matplotlib.use("Agg")  # бэкенд без GUI (нужен для Streamlit на сервере)
 import matplotlib.pyplot as plt
 import streamlit as st
 
-from homework_lab3 import (
+from homework_lab3 import (  # ядро: все формулы интерполяции
     build_tables,
     divided_differences_coeffs,
     divided_differences_triangle,
@@ -32,7 +40,7 @@ from homework_lab3 import (
     table2_test_points,
 )
 
-# Как в лабораторной №1 (homework_ui): тёмный фон, золотой акцент, полупрозрачные заливки
+# --- Стили графиков (как в лаб. №1): тёмный фон, золотой акцент ---
 _PLOT_FACE = "#000000"
 _ACCENT = "#FFD700"
 _ACCENT2 = "#FFA500"
@@ -42,6 +50,7 @@ _LEGEND_FACE = "#1A1A1A"
 
 
 def _style_plot_axes(fig: plt.Figure, ax: plt.Axes) -> None:
+    """Единый вид осей: чёрный фон, золотая сетка и рамка, светлые подписи."""
     fig.patch.set_facecolor(_PLOT_FACE)
     ax.set_facecolor(_PLOT_FACE)
     ax.tick_params(colors=_TEXT)
@@ -56,7 +65,7 @@ def _style_plot_axes(fig: plt.Figure, ax: plt.Axes) -> None:
 
 
 def _fmt(x: float) -> str:
-    return f"{x:.10g}"
+    return f"{x:.10g}"  # компактный вывод чисел в LaTeX-таблицах
 
 
 def _linspace(a: float, b: float, n: int) -> list[float]:
@@ -66,11 +75,12 @@ def _linspace(a: float, b: float, n: int) -> list[float]:
 
 
 def latex_cases_table1(g: int, k: int) -> str:
+    """LaTeX: формулы узлов таблицы 1 через base = g - 2k."""
     base = g - 2 * k
     return (
         rf"\begin{{cases}}"
         rf"x_0={base}-3,\ x_1={base}-1,\ x_2={base},\ x_3={base}+2\\"
-        rf"f(x)=\dfrac{{\sin x}}{{x}}\ (\text{{при }}x=0:\ f(0)=1)"
+        rf"f(x)=\sin x + x"
         rf"\end{{cases}}"
     )
 
@@ -100,7 +110,7 @@ def latex_divided_differences_aligned(x: list[float], tri: list[list[float | Non
     return "".join(parts)
 
 
-def fig_interpolation_overview(
+def fig_interpolation_overview(  # общий график f, Лагранж (табл.1), сплайн, узлы
     x1: list[float],
     y1: list[float],
     x2: list[float],
@@ -124,7 +134,7 @@ def fig_interpolation_overview(
     y_bot = min(y_all) - (0.12 * span if span > 0 else 0.5)
     ax.fill_between(xs, y_bot, fy, alpha=0.12, color=_ACCENT, linewidth=0, zorder=0)
 
-    ax.plot(xs, fy, color=_ACCENT, linewidth=2.2, label=r"$f(x)=\sin x/x$", zorder=2)
+    ax.plot(xs, fy, color=_ACCENT, linewidth=2.2, label=r"$f(x)=\sin x + x$", zorder=2)
     ax.plot(
         xs,
         Ly,
@@ -177,6 +187,9 @@ def fig_interpolation_overview(
     return fig
 
 
+# =============================================================================
+# СТРАНИЦА: параметры g, k и кнопка запуска
+# =============================================================================
 st.set_page_config(page_title="Лабораторная · интерполяция", layout="wide")
 st.title("Лабораторная №3: приближение функций (интерполяция)")
 st.markdown(
@@ -195,21 +208,22 @@ with c2:
     k = st.number_input("k (номер группы)", value=3, step=1, format="%d")
 
 if not st.button("Рассчитать", type="primary"):
-    st.stop()
+    st.stop()  # до нажатия кнопки отчёт не строим
 
-g_i, k_i = int(g), int(k)
-data = build_tables(g_i, k_i)
+g_i, k_i = int(g), int(k)  # вариант студента
+data = build_tables(g_i, k_i)  # узлы x1,x2 и значения y1,y2, шаг h2
 x1, y1 = data["table1"]
 x2, y2 = data["table2"]
 h2 = data["h2"]
 x0_2 = data["x0_table2"]
 
+# --- Исходные таблицы 1 и 2 (неравные / равные узлы) ---
 st.markdown("### Исходные данные")
 st.markdown(
     "**Лекция 1:** постановка задачи полиномиальной интерполяции — ищем $P_n$ такой, что "
     r"$P_n(x_i)=y_i=f(x_i)$ на узлах."
 )
-st.latex(r"f(x)=\dfrac{\sin x}{x},\quad x\neq 0;\quad f(0)=1.")
+st.latex(r"f(x)=\sin x + x")
 st.latex(latex_cases_table1(g_i, k_i))
 
 st.markdown("### Таблица 1 (неравноотстоящие узлы)")
@@ -237,7 +251,10 @@ fig0 = fig_interpolation_overview(x1, y1, x2, y2)
 st.pyplot(fig0, width="stretch")
 plt.close(fig0)
 
-# --- Задание 1 ---
+# =============================================================================
+# ЗАДАНИЕ 1 — Лагранж по таблице 2 (равноотстоящие узлы)
+# Код: lagrange_trace_at, lagrange_interpolate в homework_lab3.py
+# =============================================================================
 st.divider()
 st.subheader("1. Многочлен Лагранжа (равноотстоящие узлы, таблица 2)")
 st.markdown(
@@ -245,7 +262,7 @@ st.markdown(
     r"явный вид $\ell_i(x)=\prod_{j\neq i}\frac{x-x_j}{x_i-x_j}$. "
     "**Лекция 3:** равноотстоящие узлы $x_i=x_0+i h$ — **формула Лагранжа та же**, меняется только расположение узлов."
 )
-demo_x = x0_2 + 0.37 * h2
+demo_x = x0_2 + 0.37 * h2  # демо-точка между узлами (0.37 шага от x0)
 st.latex(rf"x_{{\mathrm{{demo}}}} = x_0+0{{,}}37h = {_fmt(demo_x)}")
 with st.expander(
     r"Пошагово: вклад каждого $\ell_i(x)\cdot y_i$ в точке $x_{\mathrm{demo}}$",
@@ -262,7 +279,10 @@ with st.expander(
 f_demo = f_variant(demo_x)
 st.latex(rf"f(x_{{\mathrm{{demo}}}})={_fmt(f_demo)},\quad |P-f|={_fmt(abs(tot-f_demo))}")
 
-# --- Задание 2 ---
+# =============================================================================
+# ЗАДАНИЕ 2 — таблица 1: разделённые разности, Лагранж, Ньютон (+ перестановка узлов)
+# Код: divided_differences_*, newton_interpolate_general(..., reorder=True/False)
+# =============================================================================
 st.divider()
 st.subheader("2. Лагранж и Ньютон по таблице 1 (неравноотстоящие узлы)")
 st.markdown(
@@ -304,7 +324,7 @@ for xv in pts1:
         N0 = newton_interpolate_general(x1, y1, xv, reorder=False)
         st.latex(rf"N(x)={_fmt(N0)},\quad |N-f|={_fmt(abs(N0-f_ex))}")
         st.markdown("**Ньютон с перенумерацией узлов по $|x-x_i|$ (лекция 4, практическая рекомендация):**")
-        order = sorted(range(len(x1)), key=lambda i: abs(xv - x1[i]))
+        order = sorted(range(len(x1)), key=lambda i: abs(xv - x1[i]))  # перестановка |x-x_i|
         x_ord = [x1[i] for i in order]
         st.latex(r"\text{Порядок индексов узлов: }" + ", ".join(str(i) for i in order))
         N1 = newton_interpolate_general(x1, y1, xv, reorder=True)
@@ -328,10 +348,13 @@ st.latex(
     + r"\end{array}"
 )
 
-# --- Задание 3 ---
+# =============================================================================
+# ЗАДАНИЕ 3 — таблица 2: первая (Δ) и вторая (∇) формулы Ньютона — один P_3(x)
+# Код: newton_forward_trace, newton_backward_trace; |N→ - N∇| ≈ машинный ноль
+# =============================================================================
 st.divider()
 st.subheader("3. Ньютон по таблице 2 (равноотстоящие узлы)")
-xn_2 = float(x2[-1])
+xn_2 = float(x2[-1])  # правый узел x_n для обратной формулы
 st.markdown(
     "**Лекция 3:** прямые разности $\\Delta^k y_i$ и обратные $\\nabla^k y_i$. "
     "**Первая формула Ньютона (лекция 3–4, (46)):** $q=(x-x_0)/h$, "
@@ -354,7 +377,7 @@ st.latex(
     + r"\big]"
 )
 
-x2_rev = list(reversed(x2))
+x2_rev = list(reversed(x2))  # обратный порядок узлов — для контроля через (49)
 y2_rev = list(reversed(y2))
 coeffs_rev = divided_differences_coeffs(x2_rev, y2_rev)
 pts2 = table2_test_points(g_i, k_i)
@@ -421,7 +444,10 @@ st.caption(
     r"$N_{\mathrm{обр}}$ — (49) при переставленных узлах (тот же $P_3$)."
 )
 
-# --- Задание 4 + график сплайна крупно ---
+# =============================================================================
+# ЗАДАНИЕ 4 — линейный сплайн по таблице 1 + отдельный график сплайна
+# Код: linear_spline_segments, linear_spline в homework_lab3.py
+# =============================================================================
 st.divider()
 st.subheader("4. Линейный сплайн по таблице 1")
 st.markdown(
@@ -443,6 +469,7 @@ pts_s = spline_test_points(g_i, k_i)
 
 
 def _segment_for_point(x_nodes: list[float], segs: list[dict[str, float]], xv: float) -> dict[str, float]:
+    """Какой отрезок [x_lo,x_hi] содержит контрольную точку xv (для вывода a,b)."""
     if xv <= x_nodes[0]:
         return segs[0]
     if xv >= x_nodes[-1]:
